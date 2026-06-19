@@ -1,0 +1,1354 @@
+ ```html
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧歷年成績分析與學習導航系統</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome 圖標 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#f5f7ff',
+                            100: '#ebf0ff',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            800: '#3730a3',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&display=swap');
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #f8fafc;
+        }
+        /* 列印樣式優化 */
+        @media print {
+            body {
+                background-color: #fff !important;
+                color: #000 !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .print-full-width {
+                width: 100% !important;
+                grid-column: span 12 / span 12 !important;
+            }
+            .print-card {
+                border: 1px solid #e2e8f0 !important;
+                box-shadow: none !important;
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-800 flex flex-col">
+
+    <!-- 頂部導覽列 (列印時隱藏) -->
+    <header class="bg-gradient-to-r from-primary-800 to-indigo-900 text-white shadow-md no-print">
+        <div class="max-w-7xl mx-auto px-4 py-5 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="p-2.5 bg-white/10 rounded-xl backdrop-blur-sm">
+                    <i class="fa-solid fa-graduation-cap text-2xl text-indigo-200"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-bold tracking-wide">個人成績分析與學習導航系統</h1>
+                    <p class="text-xs sm:text-sm text-indigo-200 mt-0.5">智慧型歷年成績統計與 GPA 趨勢成長工具</p>
+                </div>
+            </div>
+            <!-- 右上角個人名片 -->
+            <div class="flex items-center gap-4 bg-white/10 px-5 py-2.5 rounded-xl border border-white/10 backdrop-blur-sm">
+                <div id="header-avatar" class="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center font-bold text-white shadow-inner">
+                    訪客
+                </div>
+                <div class="text-left">
+                    <div class="text-sm font-semibold flex items-center gap-1.5">
+                        <span id="header-student-name">訪客學生</span> 
+                        <span class="text-xs bg-emerald-500 text-white px-1.5 py-0.5 rounded">分析中</span>
+                    </div>
+                    <div id="header-student-id" class="text-xs text-indigo-200">學號: 未填寫</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主要內容區 -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 py-8 sm:px-6 lg:px-8">
+        
+        <!-- 自訂 Toast 訊息提示 -->
+        <div id="toast" class="hidden fixed top-5 right-5 z-50 transform transition-all duration-300 translate-y-[-20px] opacity-0 no-print">
+            <div class="flex items-center gap-3 bg-slate-900 text-white px-5 py-3.5 rounded-xl shadow-xl border border-slate-800">
+                <span id="toast-icon"></span>
+                <p id="toast-message" class="text-sm font-medium"></p>
+            </div>
+        </div>
+
+        <!-- 自訂對話視窗 (Modal) -->
+        <div id="confirm-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm no-print">
+            <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 transform transition-all scale-95 opacity-0 duration-200" id="confirm-modal-box">
+                <div class="flex items-start gap-4">
+                    <div class="p-3 bg-rose-50 text-rose-600 rounded-xl">
+                        <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-900" id="confirm-title">確認操作</h3>
+                        <p class="text-slate-500 text-sm mt-2" id="confirm-message">您確定要執行此操作嗎？此步驟將無法還原。</p>
+                    </div>
+                </div>
+                <div class="mt-6 flex justify-end gap-3">
+                    <button id="confirm-cancel-btn" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl text-sm transition">取消</button>
+                    <button id="confirm-action-btn" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-medium rounded-xl text-sm transition shadow-sm">確定執行</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 隱藏列印抬頭 (僅在列印時顯現) -->
+        <div class="hidden print:block mb-8 text-center border-b-2 border-slate-300 pb-4">
+            <h1 class="text-3xl font-black text-slate-900">歷年成績分析與學習學術診斷報告</h1>
+            <p class="text-sm text-slate-500 mt-2">
+                學生姓名：<span id="print-name" class="font-bold underline">訪客學生</span> &nbsp;&nbsp;|&nbsp;&nbsp; 
+                學號：<span id="print-id" class="font-bold underline">未填寫</span> &nbsp;&nbsp;|&nbsp;&nbsp; 
+                產出日期：<span id="print-date" class="font-bold underline"></span>
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <!-- 左側：輸入與管理面板 -->
+            <div class="lg:col-span-4 space-y-6 no-print">
+                
+                <!-- 學生基本資訊設定 -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+                    <h3 class="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-user-graduate text-primary-600"></i>
+                        使用者基本設定
+                    </h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label for="student-name-input" class="block text-xs font-semibold text-slate-500 uppercase mb-1">您的姓名</label>
+                            <input type="text" id="student-name-input" placeholder="例如：王志豪" value="訪客學生" 
+                                class="w-full px-4 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent transition">
+                        </div>
+                        <div>
+                            <label for="student-id-input" class="block text-xs font-semibold text-slate-500 uppercase mb-1">學號 (選填)</label>
+                            <input type="text" id="student-id-input" placeholder="例如：413630236" value="" 
+                                class="w-full px-4 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent transition">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 學期管理卡片 -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+                    <h3 class="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-calendar-days text-indigo-600"></i>
+                        學期切換與管理
+                    </h3>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">目前選擇學期</label>
+                            <select id="semester-selector" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 transition">
+                                <!-- JS 動態填充 -->
+                            </select>
+                        </div>
+                        <div class="flex gap-2">
+                            <input type="text" id="new-semester-input" placeholder="新增學期(如: 112-1)" 
+                                class="flex-grow px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary-600">
+                            <button id="add-semester-btn" class="bg-slate-800 hover:bg-slate-900 text-white px-3 py-2 rounded-xl text-xs font-medium transition flex items-center gap-1">
+                                <i class="fa-solid fa-plus"></i> 新增
+                            </button>
+                            <button id="delete-semester-btn" class="border border-rose-100 text-rose-600 hover:bg-rose-50 px-3 py-2 rounded-xl text-xs font-medium transition flex items-center gap-1" title="刪除本學期">
+                                <i class="fa-solid fa-trash-can"></i> 刪除
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 新增 / 編輯成績 -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+                    <h3 class="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-plus-circle text-primary-600"></i>
+                        新增 / 編輯科目成績
+                    </h3>
+                    
+                    <form id="grade-form" class="space-y-4">
+                        <input type="hidden" id="edit-id" value="">
+                        <div>
+                            <label for="subject-name" class="block text-xs font-semibold text-slate-500 uppercase mb-1">科目名稱</label>
+                            <input type="text" id="subject-name" required placeholder="例如：微積分、程式設計、英文" 
+                                class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent transition">
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="subject-score" class="block text-xs font-semibold text-slate-500 uppercase mb-1">學期成績 (0-100)</label>
+                                <input type="number" id="subject-score" required min="0" max="100" placeholder="分數"
+                                    class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent transition">
+                            </div>
+                            <div>
+                                <label for="subject-credits" class="block text-xs font-semibold text-slate-500 uppercase mb-1">學分數</label>
+                                <input type="number" id="subject-credits" required min="1" max="10" placeholder="學分"
+                                    class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent transition">
+                            </div>
+                        </div>
+
+                        <div class="pt-2 flex gap-2">
+                            <button type="submit" id="submit-btn" class="flex-1 bg-primary-600 hover:bg-primary-700 text-white font-medium py-2.5 px-4 rounded-xl transition duration-150 flex items-center justify-center gap-2 shadow-sm">
+                                <i class="fa-solid fa-check"></i>
+                                <span id="submit-btn-text">確認新增</span>
+                            </button>
+                            <button type="button" id="cancel-edit-btn" class="hidden px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium rounded-xl transition">
+                                取消
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- 科目清單管理 -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col" style="max-height: 480px;">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                            <i class="fa-solid fa-list-check text-indigo-600"></i>
+                            <span id="current-semester-label">當前學期</span>學科列表
+                        </h3>
+                        <span id="subject-count" class="bg-slate-100 text-slate-600 text-xs font-semibold px-2.5 py-1 rounded-full">0 科</span>
+                    </div>
+
+                    <!-- 快速預設資料 & 清空 -->
+                    <div class="grid grid-cols-2 gap-2 mb-4">
+                        <button id="load-demo-btn" class="py-2 px-2 border border-dashed border-slate-300 hover:border-indigo-400 hover:bg-indigo-50/50 text-slate-600 hover:text-indigo-600 rounded-xl text-xs font-medium transition flex items-center justify-center gap-1">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> 載入歷年範例數據
+                        </button>
+                        <button id="clear-all-btn" class="py-2 px-2 border border-rose-100 hover:bg-rose-50 text-rose-600 rounded-xl text-xs font-medium transition flex items-center justify-center gap-1">
+                            <i class="fa-solid fa-trash-arrow-up"></i> 清空全部
+                        </button>
+                    </div>
+
+                    <!-- 匯入與匯出 -->
+                    <div class="grid grid-cols-2 gap-2 mb-4 border-b border-slate-100 pb-4">
+                        <button id="export-btn" class="py-1.5 px-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg text-xs font-medium transition flex items-center justify-center gap-1">
+                            <i class="fa-solid fa-file-export"></i> 匯出備份 (.json)
+                        </button>
+                        <label class="py-1.5 px-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg text-xs font-medium transition flex items-center justify-center gap-1 cursor-pointer text-center">
+                            <i class="fa-solid fa-file-import"></i> 匯入備份
+                            <input type="file" id="import-file-input" accept=".json" class="hidden">
+                        </label>
+                    </div>
+
+                    <!-- 捲動列表 -->
+                    <div id="subject-list" class="flex-grow overflow-y-auto space-y-3 pr-1 divide-y divide-slate-100">
+                        <div class="text-center py-8 text-slate-400 text-sm">
+                            <i class="fa-solid fa-inbox text-3xl mb-2 block"></i>
+                            尚未登錄成績。
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右側：分析大盤 (列印時展開至 100% 寬度) -->
+            <div class="lg:col-span-8 space-y-8 print-full-width">
+                
+                <!-- 工具列 (列印 / PDF 產出) -->
+                <div class="flex justify-end gap-3 no-print">
+                    <button onclick="window.print()" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-medium transition flex items-center gap-2 shadow-sm">
+                        <i class="fa-solid fa-print"></i> 列印 / 產生 PDF 診斷書
+                    </button>
+                </div>
+
+                <!-- 歷年與當期數據總覽儀表板 (KPI 卡片) -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 print-card rounded-2xl bg-white p-2 shadow-sm">
+                    <!-- 當期平均分數 -->
+                    <div class="p-5 flex flex-col justify-between relative overflow-hidden">
+                        <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">當期加權平均</div>
+                        <div class="flex items-baseline gap-1.5">
+                            <span id="stat-average" class="text-3xl font-extrabold text-slate-900">0.0</span>
+                            <span class="text-xs text-slate-400">分</span>
+                        </div>
+                        <div class="mt-3 flex items-center gap-1.5 text-xs">
+                            <span id="badge-pass" class="px-2 py-0.5 rounded-full font-medium bg-slate-100 text-slate-500">無數據</span>
+                        </div>
+                        <div class="absolute right-3 bottom-3 opacity-5 text-primary-600 text-4xl no-print">
+                            <i class="fa-solid fa-chart-line"></i>
+                        </div>
+                    </div>
+
+                    <!-- 當期 GPA -->
+                    <div class="p-5 border-l border-slate-100 flex flex-col justify-between relative overflow-hidden">
+                        <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">當期 GPA</div>
+                        <div class="flex items-baseline gap-1.5">
+                            <span id="stat-gpa" class="text-3xl font-extrabold text-indigo-600">0.00</span>
+                            <span class="text-xs text-slate-400">/ 4.0</span>
+                        </div>
+                        <div class="mt-3 text-xs text-slate-400">
+                            等第: <span id="stat-letter-grade" class="font-bold text-slate-700">-</span>
+                        </div>
+                        <div class="absolute right-3 bottom-3 opacity-5 text-indigo-600 text-4xl no-print">
+                            <i class="fa-solid fa-award"></i>
+                        </div>
+                    </div>
+
+                    <!-- 歷年累計總學分 -->
+                    <div class="p-5 border-l border-slate-100 flex flex-col justify-between relative overflow-hidden">
+                        <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">歷年累計總學分</div>
+                        <div class="flex items-baseline gap-1.5">
+                            <span id="stat-cumulative-credits" class="text-3xl font-extrabold text-slate-900">0</span>
+                            <span class="text-xs text-slate-400">學分</span>
+                        </div>
+                        <div class="mt-3 text-xs text-slate-400">
+                            當期修習: <span id="stat-credits" class="font-bold text-indigo-500">0</span> 學分
+                        </div>
+                        <div class="absolute right-3 bottom-3 opacity-5 text-emerald-600 text-4xl no-print">
+                            <i class="fa-solid fa-book-bookmark"></i>
+                        </div>
+                    </div>
+
+                    <!-- 歷年累積 GPA -->
+                    <div class="p-5 border-l border-slate-100 flex flex-col justify-between relative overflow-hidden">
+                        <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">歷年累積總 GPA</div>
+                        <div class="flex items-baseline gap-1.5">
+                            <span id="stat-cumulative-gpa" class="text-3xl font-extrabold text-teal-600">0.00</span>
+                            <span class="text-xs text-slate-400">/ 4.0</span>
+                        </div>
+                        <div class="mt-3 text-xs text-slate-400">
+                            當期最低: <span id="stat-lowest-name" class="font-bold text-rose-500 truncate inline-block max-w-[100px]">無</span> (<span id="stat-lowest-score" class="font-bold">0</span>分)
+                        </div>
+                        <div class="absolute right-3 bottom-3 opacity-5 text-teal-600 text-4xl no-print">
+                            <i class="fa-solid fa-chart-area"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 雙圖表區塊 (成績分佈與 GPA 趨勢) -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- 圖表 1：當前學期成績分布 -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 print-card">
+                        <h3 class="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-bar text-primary-600 no-print"></i>
+                            當前學期成績分布與及格線
+                        </h3>
+                        <div class="relative w-full" style="height: 250px;">
+                            <canvas id="gradeChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- 圖表 2：歷年 GPA 趨勢圖 -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 print-card">
+                        <h3 class="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-line text-teal-600 no-print"></i>
+                            歷年學期 GPA 走勢趨勢圖
+                        </h3>
+                        <div class="relative w-full" style="height: 250px;">
+                            <canvas id="trendChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 列印專用學科表格 (僅在列印時顯現) -->
+                <div class="hidden print:block bg-white border border-slate-200 rounded-xl p-6">
+                    <h3 class="text-lg font-bold text-slate-900 mb-3">學期學科成績明細表</h3>
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-slate-300 text-slate-500 text-sm">
+                                <th class="py-2">學期</th>
+                                <th class="py-2">科目名稱</th>
+                                <th class="py-2 text-center">學分數</th>
+                                <th class="py-2 text-center">學期得分</th>
+                                <th class="py-2 text-center">等第</th>
+                            </tr>
+                        </thead>
+                        <tbody id="print-table-body" class="divide-y divide-slate-100">
+                            <!-- JS 動態插入 -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 診斷中心：學習建議與加強方案 -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-6 print-card">
+                    <div class="flex justify-between items-center border-b border-slate-100 pb-4">
+                        <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                            <i class="fa-solid fa-compass text-indigo-600 no-print"></i>
+                            <span id="advice-student-name">訪客學生</span>的學術診斷與學習建議
+                        </h3>
+                        <span class="text-xs bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full font-medium no-print">即時趨勢顧問評估</span>
+                    </div>
+
+                    <!-- 診斷狀態展示 -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="p-4 rounded-xl bg-slate-50 border border-slate-100">
+                            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> 當前學期及格狀態總覽
+                            </h4>
+                            <ul id="suggest-fail-list" class="space-y-2 mt-1">
+                                <li class="text-slate-500 text-sm">暫無數據</li>
+                            </ul>
+                        </div>
+                        <div class="p-4 rounded-xl bg-slate-50 border border-slate-100">
+                            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> 歷年卓越表現亮點
+                            </h4>
+                            <p id="suggest-excellence" class="text-slate-600 text-sm leading-relaxed mt-1">
+                                暫無數據，請先登錄多門科目分數。
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- 詳細學習指引 -->
+                    <div class="bg-indigo-50/50 rounded-xl p-5 border border-indigo-100">
+                        <h4 class="text-sm font-bold text-indigo-900 flex items-center gap-1.5 mb-2.5">
+                            <i class="fa-solid fa-lightbulb text-indigo-500 no-print"></i>
+                            歷年學習方針與行動指南
+                        </h4>
+                        <div id="suggest-action-plan" class="text-slate-700 text-sm leading-relaxed space-y-2">
+                            請輸入您的學期成績，系統將會根據您的分數，為您產出對應各科目的補強建議、讀書進度分配，以及期末 GPA 衝刺的客製化行動方案！
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- 底部頁尾 -->
+    <footer class="bg-slate-900 text-slate-400 py-6 border-t border-slate-800 text-center text-xs mt-auto no-print">
+        <p>通用成績分析與學習導航系統 © 2026</p>
+        <p class="text-slate-500 mt-1">完全本地安全運行 · 支援多學期 GPA 趨勢追蹤管理</p>
+    </footer>
+
+    <!-- JavaScript 業務邏輯 -->
+    <script>
+        // 初始化多學期 state 數據
+        let semesters = {
+            "112-2": [] // 預設有一個學期
+        };
+        let currentSemester = "112-2";
+        let studentName = "訪客學生";
+        let studentId = "";
+
+        let gradeChart = null;
+        let trendChart = null;
+
+        // 四個學期的歷年完整示範數據
+        const demoData = {
+            name: "陳小明",
+            id: "S11209042",
+            currentSemester: "112-2",
+            semesters: {
+                "111-1": [
+                    { id: "demo-1111-1", name: "微積分 (一)", score: 65, credits: 3 },
+                    { id: "demo-1111-2", name: "普通物理", score: 62, credits: 3 },
+                    { id: "demo-1111-3", name: "計算機概論", score: 72, credits: 3 },
+                    { id: "demo-1111-4", name: "英文精實 (一)", score: 85, credits: 2 }
+                ],
+                "111-2": [
+                    { id: "demo-1112-1", name: "微積分 (二)", score: 72, credits: 3 },
+                    { id: "demo-1112-2", name: "程式設計基礎", score: 88, credits: 4 },
+                    { id: "demo-1112-3", name: "英文精實 (二)", score: 80, credits: 2 },
+                    { id: "demo-1112-4", name: "體育與健康", score: 90, credits: 1 }
+                ],
+                "112-1": [
+                    { id: "demo-1121-1", name: "資料結構", score: 84, credits: 3 },
+                    { id: "demo-1121-2", name: "線性代數", score: 55, credits: 3 }, // 未達 60 
+                    { id: "demo-1121-3", name: "離散數學", score: 74, credits: 3 },
+                    { id: "demo-1121-4", name: "通識人文思潮", score: 92, credits: 2 }
+                ],
+                "112-2": [
+                    { id: "demo-1122-1", name: "演算法", score: 91, credits: 3 },
+                    { id: "demo-1122-2", name: "作業系統", score: 85, credits: 3 },
+                    { id: "demo-1122-3", name: "軟體工程實務", score: 88, credits: 3 },
+                    { id: "demo-1122-4", name: "資料庫系統", score: 95, credits: 3 }
+                ]
+            }
+        };
+
+        // 頁面載入完成後初始化
+        window.addEventListener('DOMContentLoaded', () => {
+            initElements();
+            initCharts();
+            loadFromLocalStorage(); 
+        });
+
+        // 元素與監聽器綁定
+        function initElements() {
+            // 表單提交
+            const form = document.getElementById('grade-form');
+            form.addEventListener('submit', handleFormSubmit);
+
+            const cancelBtn = document.getElementById('cancel-edit-btn');
+            cancelBtn.addEventListener('click', cancelEdit);
+
+            // 雙向綁定姓名學號設定
+            const nameInput = document.getElementById('student-name-input');
+            const idInput = document.getElementById('student-id-input');
+
+            nameInput.addEventListener('input', () => {
+                studentName = nameInput.value.trim() || '訪客學生';
+                updateStudentInfo();
+                saveToLocalStorage();
+            });
+            idInput.addEventListener('input', () => {
+                studentId = idInput.value.trim();
+                updateStudentInfo();
+                saveToLocalStorage();
+            });
+
+            // 學期切換與新增
+            const semesterSelector = document.getElementById('semester-selector');
+            semesterSelector.addEventListener('change', (e) => {
+                currentSemester = e.target.value;
+                document.getElementById('current-semester-label').innerText = currentSemester;
+                cancelEdit();
+                saveToLocalStorage();
+                render();
+            });
+
+            const addSemesterBtn = document.getElementById('add-semester-btn');
+            addSemesterBtn.addEventListener('click', () => {
+                const newSemInput = document.getElementById('new-semester-input');
+                const newSemName = newSemInput.value.trim();
+                if (!newSemName) {
+                    showToast('請輸入學期名稱！', 'warning');
+                    return;
+                }
+                if (semesters[newSemName]) {
+                    showToast('此學期已存在！', 'warning');
+                    return;
+                }
+                semesters[newSemName] = [];
+                currentSemester = newSemName;
+                newSemInput.value = '';
+                
+                showToast(`已新增並切換至學期「${newSemName}」`, 'success');
+                saveToLocalStorage();
+                render();
+            });
+
+            const deleteSemesterBtn = document.getElementById('delete-semester-btn');
+            deleteSemesterBtn.addEventListener('click', () => {
+                const semKeys = Object.keys(semesters);
+                if (semKeys.length <= 1) {
+                    showToast('至少必須保留一個學期！', 'warning');
+                    return;
+                }
+                showConfirmModal(
+                    `確認刪除學期「${currentSemester}」及所有課程？`,
+                    `這將會徹底抹除該學期已登錄的所有科目分數與學分。`,
+                    () => {
+                        delete semesters[currentSemester];
+                        // 自動切換到剩餘的第一個學期
+                        currentSemester = Object.keys(semesters)[0];
+                        showToast('學期已刪除。', 'info');
+                        saveToLocalStorage();
+                        render();
+                    }
+                );
+            });
+
+            // 載入範例資料按鈕
+            const demoBtn = document.getElementById('load-demo-btn');
+            demoBtn.addEventListener('click', () => {
+                semesters = JSON.parse(JSON.stringify(demoData.semesters));
+                currentSemester = demoData.currentSemester;
+                nameInput.value = demoData.name;
+                idInput.value = demoData.id;
+                studentName = demoData.name;
+                studentId = demoData.id;
+                
+                updateStudentInfo(); 
+                saveToLocalStorage();
+                render();
+                showToast('已成功載入陳小明的歷年學期數據與成長趨勢！', 'success');
+            });
+
+            // 清空按鈕
+            const clearBtn = document.getElementById('clear-all-btn');
+            clearBtn.addEventListener('click', () => {
+                showConfirmModal(
+                    '確認清除所有歷年資料？', 
+                    '此動作將會清除所有學期的成績、學分以及學生基本資訊，並且無法恢復。',
+                    () => {
+                        semesters = { "112-2": [] };
+                        currentSemester = "112-2";
+                        nameInput.value = '訪客學生';
+                        idInput.value = '';
+                        studentName = '訪客學生';
+                        studentId = '';
+                        updateStudentInfo();
+                        saveToLocalStorage();
+                        render();
+                        showToast('已還原為全新預設狀態。', 'info');
+                    }
+                );
+            });
+
+            // 匯出 JSON 功能
+            document.getElementById('export-btn').addEventListener('click', exportData);
+
+            // 匯入 JSON 功能
+            document.getElementById('import-file-input').addEventListener('change', importData);
+
+            // 更新列印日期
+            document.getElementById('print-date').innerText = new Date().toLocaleDateString('zh-TW', {
+                year: 'numeric', month: 'long', day: 'numeric'
+            });
+        }
+
+        // --- LocalStorage 本地儲存功能 ---
+        function saveToLocalStorage() {
+            const studentData = {
+                name: studentName,
+                id: studentId,
+                currentSemester: currentSemester,
+                semesters: semesters
+            };
+            localStorage.setItem('grade_analysis_multi_semesters', JSON.stringify(studentData));
+        }
+
+        function loadFromLocalStorage() {
+            const raw = localStorage.getItem('grade_analysis_multi_semesters');
+            if (raw) {
+                try {
+                    const data = JSON.parse(raw);
+                    studentName = data.name || '訪客學生';
+                    studentId = data.id || '';
+                    currentSemester = data.currentSemester || Object.keys(data.semesters)[0] || "112-2";
+                    semesters = data.semesters || { "112-2": [] };
+
+                    // 同步輸入框
+                    document.getElementById('student-name-input').value = studentName;
+                    document.getElementById('student-id-input').value = studentId;
+
+                    updateStudentInfo();
+                    render();
+                } catch (e) {
+                    console.error("載入本地多學期資料出錯", e);
+                }
+            } else {
+                updateStudentInfo();
+                render();
+            }
+        }
+
+        // --- 匯出與匯入備份 ---
+        function exportData() {
+            if (Object.keys(semesters).length === 0 || Object.values(semesters).every(arr => arr.length === 0)) {
+                showToast('目前沒有任何學科資料可以匯出。', 'warning');
+                return;
+            }
+            const studentData = {
+                name: studentName,
+                id: studentId,
+                currentSemester: currentSemester,
+                semesters: semesters
+            };
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(studentData, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `${studentName}_歷年成績完整備份.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+            showToast('歷年資料備份導出完成！', 'success');
+        }
+
+        function importData(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const data = JSON.parse(evt.target.result);
+                    if (data && typeof data.semesters === 'object') {
+                        studentName = data.name || '訪客學生';
+                        studentId = data.id || '';
+                        semesters = data.semesters;
+                        currentSemester = data.currentSemester || Object.keys(semesters)[0];
+                        
+                        document.getElementById('student-name-input').value = studentName;
+                        document.getElementById('student-id-input').value = studentId;
+
+                        updateStudentInfo();
+                        saveToLocalStorage();
+                        render();
+                        showToast('歷年備份檔案匯入成功！', 'success');
+                    } else {
+                        showToast('無效的備份檔案格式。', 'warning');
+                    }
+                } catch (err) {
+                    showToast('解析備份檔案時發生錯誤。', 'warning');
+                }
+                e.target.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        // --- 客製化確認對話框 (Modal) ---
+        function showConfirmModal(title, msg, onConfirm) {
+            const modal = document.getElementById('confirm-modal');
+            const modalBox = document.getElementById('confirm-modal-box');
+            document.getElementById('confirm-title').innerText = title;
+            document.getElementById('confirm-message').innerText = msg;
+
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modalBox.classList.remove('scale-95', 'opacity-0');
+                modalBox.classList.add('scale-100', 'opacity-100');
+            }, 10);
+
+            const actionBtn = document.getElementById('confirm-action-btn');
+            const cancelBtn = document.getElementById('confirm-cancel-btn');
+
+            const closeModal = () => {
+                modalBox.classList.remove('scale-100', 'opacity-100');
+                modalBox.classList.add('scale-95', 'opacity-0');
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                }, 200);
+            };
+
+            actionBtn.onclick = () => {
+                onConfirm();
+                closeModal();
+            };
+
+            cancelBtn.onclick = closeModal;
+        }
+
+        // 同步更動使用者設定到介面
+        function updateStudentInfo() {
+            document.getElementById('header-student-name').innerText = studentName;
+            document.getElementById('print-name').innerText = studentName;
+            document.getElementById('header-student-id').innerText = studentId ? `學號: ${studentId}` : '學號: 未填寫';
+            document.getElementById('print-id').innerText = studentId || '未填寫';
+
+            document.getElementById('header-avatar').innerText = studentName.substring(0, 2);
+            document.getElementById('advice-student-name').innerText = studentName;
+            document.getElementById('current-semester-label').innerText = currentSemester;
+        }
+
+        // Toast 彈窗控制
+        function showToast(msg, type = 'info') {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toast-message');
+            const toastIcon = document.getElementById('toast-icon');
+
+            toastMsg.innerText = msg;
+
+            if (type === 'success') {
+                toastIcon.innerHTML = '<i class="fa-solid fa-circle-check text-emerald-400 text-lg"></i>';
+            } else if (type === 'warning') {
+                toastIcon.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-amber-400 text-lg"></i>';
+            } else {
+                toastIcon.innerHTML = '<i class="fa-solid fa-circle-info text-blue-400 text-lg"></i>';
+            }
+
+            toast.classList.remove('hidden');
+            setTimeout(() => {
+                toast.classList.remove('translate-y-[-20px]', 'opacity-0');
+                toast.classList.add('translate-y-0', 'opacity-100');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-[-20px]', 'opacity-0');
+                setTimeout(() => {
+                    toast.classList.add('hidden');
+                }, 300);
+            }, 3000);
+        }
+
+        // 繪製與初始化圖表 (Chart.js)
+        function initCharts() {
+            // 圖表 1: 當前學期成績分佈
+            const ctx1 = document.getElementById('gradeChart').getContext('2d');
+            gradeChart = new Chart(ctx1, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: '科目成績',
+                            data: [],
+                            backgroundColor: 'rgba(79, 70, 229, 0.15)',
+                            borderColor: 'rgba(79, 70, 229, 0.85)',
+                            borderWidth: 2,
+                            borderRadius: 8,
+                            type: 'bar',
+                            order: 2
+                        },
+                        {
+                            label: '及格線 (60分)',
+                            data: [],
+                            borderColor: 'rgba(239, 68, 68, 0.6)',
+                            borderWidth: 1.5,
+                            borderDash: [6, 6],
+                            pointRadius: 0,
+                            fill: false,
+                            type: 'line',
+                            order: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: { font: { family: 'Noto Sans TC', size: 11 } }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            min: 0,
+                            max: 100,
+                            grid: { color: '#f1f5f9' },
+                            ticks: { font: { family: 'Noto Sans TC' } }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { font: { family: 'Noto Sans TC' } }
+                        }
+                    }
+                }
+            });
+
+            // 圖表 2: 歷年 GPA 走勢趨勢圖
+            const ctx2 = document.getElementById('trendChart').getContext('2d');
+            trendChart = new Chart(ctx2, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: '學期加權 GPA',
+                        data: [],
+                        borderColor: '#0d9488',
+                        backgroundColor: 'rgba(13, 148, 136, 0.1)',
+                        borderWidth: 3,
+                        pointBackgroundColor: '#0d9488',
+                        pointHoverBackgroundColor: '#0d9488',
+                        pointRadius: 5,
+                        pointHoverRadius: 7,
+                        tension: 0.35,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: { font: { family: 'Noto Sans TC', size: 11 } }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            min: 0,
+                            max: 4.0,
+                            grid: { color: '#f1f5f9' },
+                            ticks: { font: { family: 'Noto Sans TC' } }
+                        },
+                        x: {
+                            grid: { color: '#f1f5f9' },
+                            ticks: { font: { family: 'Noto Sans TC' } }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 動態排序學期 (例如 111-1 排序在 111-2、112-1 之前)
+        function getSortedSemesters() {
+            return Object.keys(semesters).sort((a, b) => {
+                // 將學期解析，例如 "111-1" => [111, 1]
+                const partsA = a.split('-').map(Number);
+                const partsB = b.split('-').map(Number);
+                if (partsA[0] !== partsB[0]) {
+                    return partsA[0] - partsB[0];
+                }
+                return partsA[1] - partsB[1];
+            });
+        }
+
+        // 更新雙圖表數據
+        function updateChartsData(sortedSemesters) {
+            if (!gradeChart || !trendChart) return;
+
+            // 1. 更新當前學期成績條形圖
+            const activeSubjects = semesters[currentSemester] || [];
+            const labels = activeSubjects.map(s => s.name);
+            const scores = activeSubjects.map(s => s.score);
+            const passLine = Array(activeSubjects.length).fill(60);
+
+            const backgroundColors = activeSubjects.map(s => 
+                s.score < 60 ? 'rgba(239, 68, 68, 0.25)' : 'rgba(79, 70, 229, 0.15)'
+            );
+            const borderColors = activeSubjects.map(s => 
+                s.score < 60 ? 'rgba(239, 68, 68, 0.9)' : 'rgba(79, 70, 229, 0.85)'
+            );
+
+            gradeChart.data.labels = labels;
+            gradeChart.data.datasets[0].data = scores;
+            gradeChart.data.datasets[0].backgroundColor = backgroundColors;
+            gradeChart.data.datasets[0].borderColor = borderColors;
+            gradeChart.data.datasets[1].data = passLine;
+            gradeChart.update();
+
+            // 2. 更新歷年 GPA 走勢圖
+            const trendLabels = [];
+            const trendGpas = [];
+
+            sortedSemesters.forEach(sem => {
+                const subs = semesters[sem] || [];
+                if (subs.length > 0) {
+                    let totalCreds = 0;
+                    let totalWeightedGPA = 0;
+                    subs.forEach(s => {
+                        totalCreds += s.credits;
+                        totalWeightedGPA += (convertScoreToGPA(s.score).gpa * s.credits);
+                    });
+                    const semGpa = totalCreds > 0 ? (totalWeightedGPA / totalCreds) : 0;
+                    trendLabels.push(sem);
+                    trendGpas.push(Number(semGpa.toFixed(2)));
+                } else {
+                    // 空白學期塞 0
+                    trendLabels.push(sem);
+                    trendGpas.push(0);
+                }
+            });
+
+            trendChart.data.labels = trendLabels;
+            trendChart.data.datasets[0].data = trendGpas;
+            trendChart.update();
+        }
+
+        // 新增 / 編輯學科
+        function handleFormSubmit(e) {
+            e.preventDefault();
+            
+            const editId = document.getElementById('edit-id').value;
+            const name = document.getElementById('subject-name').value.trim();
+            const score = parseInt(document.getElementById('subject-score').value);
+            const credits = parseInt(document.getElementById('subject-credits').value);
+
+            if (!name) return;
+            if (isNaN(score) || score < 0 || score > 100) {
+                showToast('請輸入 0 - 100 之間的成績！', 'warning');
+                return;
+            }
+            if (isNaN(credits) || credits <= 0) {
+                showToast('請輸入正確的學分數！', 'warning');
+                return;
+            }
+
+            if (!semesters[currentSemester]) {
+                semesters[currentSemester] = [];
+            }
+
+            if (editId) {
+                const idx = semesters[currentSemester].findIndex(s => s.id === editId);
+                if (idx !== -1) {
+                    semesters[currentSemester][idx] = { id: editId, name, score, credits };
+                    showToast(`學科「${name}」已更新！`, 'success');
+                }
+                cancelEdit();
+            } else {
+                const newSubject = {
+                    id: 'sub-' + Date.now(),
+                    name,
+                    score,
+                    credits
+                };
+                semesters[currentSemester].push(newSubject);
+                showToast(`已新增學科「${name}」！`, 'success');
+            }
+
+            document.getElementById('grade-form').reset();
+            saveToLocalStorage();
+            render();
+        }
+
+        // 進入編輯模式
+        function startEdit(id) {
+            const subject = semesters[currentSemester].find(s => s.id === id);
+            if (!subject) return;
+
+            document.getElementById('edit-id').value = subject.id;
+            document.getElementById('subject-name').value = subject.name;
+            document.getElementById('subject-score').value = subject.score;
+            document.getElementById('subject-credits').value = subject.credits;
+
+            document.getElementById('submit-btn-text').innerText = '儲存修改';
+            document.getElementById('submit-btn').classList.replace('bg-primary-600', 'bg-amber-500');
+            document.getElementById('submit-btn').classList.replace('hover:bg-primary-700', 'hover:bg-amber-600');
+            document.getElementById('cancel-edit-btn').classList.remove('hidden');
+        }
+
+        function cancelEdit() {
+            document.getElementById('edit-id').value = '';
+            document.getElementById('grade-form').reset();
+
+            document.getElementById('submit-btn-text').innerText = '確認新增';
+            document.getElementById('submit-btn').classList.replace('bg-amber-500', 'bg-primary-600');
+            document.getElementById('submit-btn').classList.replace('hover:bg-amber-600', 'hover:bg-primary-700');
+            document.getElementById('cancel-edit-btn').classList.add('hidden');
+        }
+
+        // 刪除科目
+        function deleteSubject(id) {
+            const subject = semesters[currentSemester].find(s => s.id === id);
+            if (!subject) return;
+            
+            showConfirmModal(
+                `確認刪除學科「${subject.name}」？`,
+                `此動作將不可恢復，該科目的成績將不再納入計算。`,
+                () => {
+                    semesters[currentSemester] = semesters[currentSemester].filter(s => s.id !== id);
+                    showToast(`已刪除學科「${subject.name}」`, 'info');
+                    saveToLocalStorage();
+                    render();
+                }
+            );
+        }
+
+        // 綜合渲染主邏輯
+        function render() {
+            const sortedSems = getSortedSemesters();
+
+            // 1. 更新下拉式選單與標題
+            renderSemesterOptions(sortedSems);
+
+            // 2. 更新科目管理清單 DOM 與 列印表格
+            renderSubjectList(sortedSems);
+
+            // 3. 計算並分析所有 GPA 數據與歷年累積
+            calculateAllStats(sortedSems);
+
+            // 4. 重繪所有圖表
+            updateChartsData(sortedSems);
+        }
+
+        // 渲染學期下拉選單
+        function renderSemesterOptions(sortedSemesters) {
+            const selector = document.getElementById('semester-selector');
+            selector.innerHTML = '';
+            sortedSemesters.forEach(sem => {
+                const opt = document.createElement('option');
+                opt.value = sem;
+                opt.innerText = `${sem} 學期`;
+                if (sem === currentSemester) {
+                    opt.selected = true;
+                }
+                selector.appendChild(opt);
+            });
+        }
+
+        // 渲染科目管理清單與列印明細表
+        function renderSubjectList(sortedSemesters) {
+            const listContainer = document.getElementById('subject-list');
+            const printTableBody = document.getElementById('print-table-body');
+            
+            const activeSubjects = semesters[currentSemester] || [];
+            const countBadge = document.getElementById('subject-count');
+            countBadge.innerText = `${activeSubjects.length} 科`;
+
+            // A. 左側互動列表
+            if (activeSubjects.length === 0) {
+                listContainer.innerHTML = `
+                    <div class="text-center py-12 text-slate-400 text-sm">
+                        <i class="fa-solid fa-inbox text-3xl mb-2 block"></i>
+                        本學期尚未登錄任何學科成績。
+                    </div>
+                `;
+            } else {
+                listContainer.innerHTML = '';
+                activeSubjects.forEach((sub) => {
+                    const isFail = sub.score < 60;
+                    const item = document.createElement('div');
+                    item.className = 'py-3 flex justify-between items-center group transition hover:bg-slate-50/50 rounded-lg px-2';
+                    item.innerHTML = `
+                        <div class="flex items-center gap-3">
+                            <div class="w-2 h-8 rounded-full ${isFail ? 'bg-rose-500' : 'bg-primary-500'}"></div>
+                            <div>
+                                <p class="font-bold text-slate-800 text-sm md:text-base">${sub.name}</p>
+                                <p class="text-xs text-slate-400">${sub.credits} 學分 · <span class="${isFail ? 'text-rose-500 font-semibold' : 'text-slate-500'}">${isFail ? '不及格' : '及格'}</span></p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <span class="text-base font-extrabold ${isFail ? 'text-rose-600' : 'text-slate-700'}">${sub.score} <span class="text-xs font-normal text-slate-400">分</span></span>
+                            <div class="flex gap-1">
+                                <button onclick="startEdit('${sub.id}')" class="text-slate-400 hover:text-amber-500 p-1.5 rounded-lg hover:bg-slate-100 transition" title="編輯科目">
+                                    <i class="fa-solid fa-pen text-xs"></i>
+                                </button>
+                                <button onclick="deleteSubject('${sub.id}')" class="text-slate-400 hover:text-rose-500 p-1.5 rounded-lg hover:bg-slate-100 transition" title="刪除科目">
+                                    <i class="fa-solid fa-trash-can text-xs"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    listContainer.appendChild(item);
+                });
+            }
+
+            // B. 僅列印時顯示的「歷年成績大表」
+            printTableBody.innerHTML = '';
+            let hasAnyData = false;
+
+            sortedSemesters.forEach(sem => {
+                const subs = semesters[sem] || [];
+                subs.forEach(sub => {
+                    hasAnyData = true;
+                    const isFail = sub.score < 60;
+                    const gpaInfo = convertScoreToGPA(sub.score);
+
+                    const printRow = document.createElement('tr');
+                    printRow.className = 'border-b border-slate-100 text-xs';
+                    printRow.innerHTML = `
+                        <td class="py-2 text-slate-500 font-medium">${sem}</td>
+                        <td class="py-2 font-bold text-slate-800">${sub.name}</td>
+                        <td class="py-2 text-center">${sub.credits} 學分</td>
+                        <td class="py-2 text-center font-bold ${isFail ? 'text-rose-600' : 'text-slate-700'}">${sub.score} 分</td>
+                        <td class="py-2 text-center font-bold text-slate-600">${gpaInfo.letter} (GPA: ${gpaInfo.gpa.toFixed(1)})</td>
+                    `;
+                    printTableBody.appendChild(printRow);
+                });
+            });
+
+            if (!hasAnyData) {
+                printTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="py-4 text-center text-slate-400">尚無登錄任何歷年成績資料</td>
+                    </tr>
+                `;
+            }
+        }
+
+        // 分數轉 GPA 等第 (標準 4.0 制)
+        function convertScoreToGPA(score) {
+            if (score >= 80) return { gpa: 4.0, letter: 'A' };
+            if (score >= 70) return { gpa: 3.0, letter: 'B' };
+            if (score >= 60) return { gpa: 2.0, letter: 'C' };
+            if (score >= 50) return { gpa: 1.0, letter: 'D' };
+            return { gpa: 0.0, letter: 'F' };
+        }
+
+        // 歷年與當前學期數據核心統計
+        function calculateAllStats(sortedSemesters) {
+            // A. 初始化當期與歷年累積變數
+            let currentCredits = 0;
+            let currentWeightedScore = 0;
+            let currentWeightedGPA = 0;
+            let currentLowest = null;
+            let currentHighest = null;
+            let currentFailedList = [];
+
+            let cumulativeCredits = 0;
+            let cumulativeWeightedGPASum = 0;
+            let cumulativeHighestSub = null;
+
+            // B. 遍歷所有學期，計算歷年累計與當期資料
+            sortedSemesters.forEach(sem => {
+                const subs = semesters[sem] || [];
+                subs.forEach(sub => {
+                    const gpaInfo = convertScoreToGPA(sub.score);
+                    
+                    // 1. 累計變數
+                    cumulativeCredits += sub.credits;
+                    cumulativeWeightedGPASum += (gpaInfo.gpa * sub.credits);
+
+                    if (!cumulativeHighestSub || sub.score > cumulativeHighestSub.score) {
+                        cumulativeHighestSub = sub;
+                    }
+
+                    // 2. 當前選定學期變數
+                    if (sem === currentSemester) {
+                        currentCredits += sub.credits;
+                        currentWeightedScore += (sub.score * sub.credits);
+                        currentWeightedGPA += (gpaInfo.gpa * sub.credits);
+
+                        if (sub.score < 60) {
+                            currentFailedList.push(sub);
+                        }
+
+                        if (!currentLowest || sub.score < currentLowest.score) {
+                            currentLowest = sub;
+                        }
+                        if (!currentHighest || sub.score > currentHighest.score) {
+                            currentHighest = sub;
+                        }
+                    }
+                });
+            });
+
+            // C. 渲染當期 KPI
+            const activeSubjects = semesters[currentSemester] || [];
+            if (activeSubjects.length === 0) {
+                // 當期無數據時，還原預設
+                document.getElementById('stat-average').innerText = '0.0';
+                document.getElementById('badge-pass').innerText = '無數據';
+                document.getElementById('badge-pass').className = 'px-2 py-0.5 rounded-full font-medium bg-slate-100 text-slate-500';
+                document.getElementById('stat-gpa').innerText = '0.00';
+                document.getElementById('stat-letter-grade').innerText = '-';
+                document.getElementById('stat-credits').innerText = '0';
+                document.getElementById('stat-lowest-name').innerText = '無';
+                document.getElementById('stat-lowest-score').innerText = '0';
+            } else {
+                const currentAvg = currentWeightedScore / currentCredits;
+                const currentGpaVal = currentWeightedGPA / currentCredits;
+
+                document.getElementById('stat-average').innerText = currentAvg.toFixed(1);
+                
+                const badgePass = document.getElementById('badge-pass');
+                if (currentAvg >= 60) {
+                    badgePass.innerText = '當期及格';
+                    badgePass.className = 'px-2.5 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-700 text-xs';
+                } else {
+                    badgePass.innerText = '當期不及格';
+                    badgePass.className = 'px-2.5 py-0.5 rounded-full font-bold bg-rose-100 text-rose-700 text-xs';
+                }
+
+                document.getElementById('stat-gpa').innerText = currentGpaVal.toFixed(2);
+                let currentLetter = 'F';
+                if (currentGpaVal >= 3.7) currentLetter = 'A';
+                else if (currentGpaVal >= 3.0) currentLetter = 'B';
+                else if (currentGpaVal >= 2.0) currentLetter = 'C';
+                else if (currentGpaVal >= 1.0) currentLetter = 'D';
+                document.getElementById('stat-letter-grade').innerText = currentLetter;
+
+                document.getElementById('stat-credits').innerText = currentCredits;
+                document.getElementById('stat-lowest-name').innerText = currentLowest.name;
+                document.getElementById('stat-lowest-score').innerText = currentLowest.score;
+            }
+
+            // D. 渲染歷年累計 KPI
+            document.getElementById('stat-cumulative-credits').innerText = cumulativeCredits;
+            const finalCumulativeGpa = cumulativeCredits > 0 ? (cumulativeWeightedGPASum / cumulativeCredits) : 0;
+            document.getElementById('stat-cumulative-gpa').innerText = finalCumulativeGpa.toFixed(2);
+
+            // E. 生成客製化診斷建議報告
+            renderAcademicAdvice(currentFailedList, currentHighest, currentLowest, cumulativeHighestSub, finalCumulativeGpa);
+        }
+
+        // 產生歷年與當期綜合學術診斷
+        function renderAcademicAdvice(failedList, highestSub, lowestSub, cumulativeHighest, cumGpa) {
+            const failListEl = document.getElementById('suggest-fail-list');
+            const excellenceEl = document.getElementById('suggest-excellence');
+            const actionPlanEl = document.getElementById('suggest-action-plan');
+
+            const activeSubjects = semesters[currentSemester] || [];
+
+            // 1. 當前學期不及格診斷
+            if (activeSubjects.length === 0) {
+                failListEl.innerHTML = '<li class="text-slate-400 text-xs">請先於左側輸入當前學科成績。</li>';
+                excellenceEl.innerText = '請登錄更多學期科目，系統將自動定位您的歷年高光學科與優勢領域。';
+                actionPlanEl.innerHTML = '<p>請輸入學期成績，系統將會為您產出各科目補強方向、進度安排以及期末 GPA 衝刺的行動計畫！</p>';
+                return;
+            }
+
+            if (failedList.length === 0) {
+                failListEl.innerHTML = `
+                    <div class="flex items-center gap-2 text-emerald-600 text-sm font-semibold">
+                        <i class="fa-solid fa-circle-check"></i>
+                        <span>當前學期目前保持全科及格，表現穩健！</span>
+                    </div>
+                `;
+            } else {
+                failListEl.innerHTML = '';
+                failedList.forEach(sub => {
+                    const li = document.createElement('li');
+                    li.className = 'flex items-center justify-between text-rose-600 bg-rose-50/50 p-2 rounded-lg border border-rose-100/60';
+                    li.innerHTML = `
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-circle-exclamation text-xs"></i>
+                            <span class="font-semibold text-xs md:text-sm">${sub.name}</span>
+                        </div>
+                        <span class="text-xs bg-rose-100 px-2 py-0.5 rounded-full font-bold">${sub.score} 分 (差 ${60 - sub.score} 分及格)</span>
+                    `;
+                    failListEl.appendChild(li);
+                });
+            }
+
+            // 2. 歷年表現亮點推薦
+            if (cumulativeHighest && cumulativeHighest.score >= 85) {
+                excellenceEl.innerHTML = `
+                    ${studentName}，您在歷年所有科目中，以<span class="font-extrabold text-slate-900 bg-emerald-50 px-1 py-0.5 rounded">「${cumulativeHighest.name}」</span>獲得了 <span class="text-emerald-600 font-extrabold text-base">${cumulativeHighest.score}</span> 分的最高分！這代表您在該專業學群或思維邏輯上極富優勢。
+                    <div class="mt-2 text-xs text-slate-500 flex items-center gap-1 no-print">
+                        <i class="fa-solid fa-arrow-up-right-dots text-emerald-500"></i>
+                        <span>目前您的歷年累計 GPA 為 <span class="font-bold text-slate-700">${cumGpa.toFixed(2)}</span>，請繼續放大您在此學群的特長。</span>
+                    </div>
+                `;
+            } else {
+                excellenceEl.innerText = `目前歷年最佳學科為「${highestSub.name}」(${highestSub.score} 分)。建議努力爭取一門核心專門科目突破至 85 分以上，建立穩固的信心高地！`;
+            }
+
+            // 3. 制定當期與歷年學習方針
+            let adviceHTML = '';
+            
+            if (failedList.length > 0) {
+                adviceHTML += `
+                    <p class="mb-3">
+                        ⚠️ <strong>重點診斷預警：</strong> 當前學期有 <span class="text-rose-600 font-extrabold">${failedList.length}</span> 門科目未達 60 分。
+                        尤其是最低分的 <strong class="text-rose-700 bg-rose-50 px-1 py-0.5 rounded">「${lowestSub.name}」 (${lowestSub.score}分)</strong>，需要儘快實施補救方針，避免影響歷年累積 GPA 的穩定爬升。
+                    </p>
+                    <div class="space-y-2 text-slate-600 text-xs md:text-sm border-l-2 border-indigo-400 pl-3">
+                        <p><strong>💡 當期即時救急指引：</strong></p>
+                        <ol class="list-decimal pl-4 space-y-1.5">
+                            <li><strong>主動接觸求助：</strong> 儘快向 <strong>${lowestSub.name}</strong> 課程教授或助教請教，確認是否有補考、補交報告或考前重點補強資源。</li>
+                            <li><strong>落實每週考點除錯：</strong> 建議每天分配 30 分鐘針對該科目的基本題型（如課本例題、課後習題）進行反覆練習，拿下最關鍵的基礎分數。</li>
+                        </ol>
+                    </div>
+                `;
+            } else {
+                adviceHTML += `
+                    <p class="mb-3 text-emerald-800">
+                        🎉 <strong>太棒了，${studentName}！</strong> 您的當期學期保持<strong>全科及格</strong>，您的歷年累積總 GPA 已穩健推進至 <span class="font-bold text-indigo-600">${cumGpa.toFixed(2)}</span>！
+                    </p>
+                `;
+
+                if (cumGpa >= 3.5) {
+                    adviceHTML += `
+                        <div class="space-y-2 text-slate-600 text-xs md:text-sm border-l-2 border-emerald-400 pl-3">
+                            <p><strong>🚀 卓越學生學術規劃（GPA 3.5+ 專用）：</strong></p>
+                            <ol class="list-decimal pl-4 space-y-1">
+                                <li><strong>鎖定學術榮譽：</strong> 您的 GPA 維持在書卷獎與卓越獎學金的潛在梯隊，請繼續保持強勢專業科目的高水準輸出。</li>
+                                <li><strong>開拓外延學習：</strong> 建議您在下學期挑戰跨系所選修，或者開始尋求參與專題研究、撰寫學術小論文的機會，為推甄研究所提前佈局。</li>
+                            </ol>
+                        </div>
+                    `;
+                } else {
+                    adviceHTML += `
+                        <div class="space-y-2 text-slate-600 text-xs md:text-sm border-l-2 border-indigo-400 pl-3">
+                            <p><strong>💪 穩定拉高累積 GPA 成長曲線：</strong></p>
+                            <ol class="list-decimal pl-4 space-y-1">
+                                <li><strong>搶攻中高潛力科目：</strong> 找出你分數落在 65-72 分的學科。在這些科目上只要稍微多投入 20% 的心力複習，就非常容易衝高至 80 分以上（即 GPA 直接從 2.0 躍升至 4.0 ），這是快速推升歷年累積 GPA 最有效率的戰略！</li>
+                                <li><strong>養成良好複習週期：</strong> 善用行事曆做好每週的進度複習，避開考前通宵「臨時抱佛腳」的低效率學習狀態。</li>
+                            </ol>
+                        </div>
+                    `;
+                }
+            }
+
+            actionPlanEl.innerHTML = adviceHTML;
+        }
+    </script>
+</body>
+</html>
+
+```
